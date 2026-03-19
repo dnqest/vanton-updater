@@ -1,7 +1,7 @@
 # main.py — автоматическое обновление отчётов
 # 1) скачиваем CSV с FTP (с retry)
 # 2) генерируем QuantStats HTML (с quantiles)
-# 3) применяем CSS-фиксы
+# 3) применяем CSS-фиксы + метка времени upd:
 # 4) перерисовываем SVG "Cumulative Returns" (проценты + запас по Y)
 
 import os
@@ -9,6 +9,7 @@ import ftplib
 import io
 import re
 import time
+import datetime
 
 import pandas as pd
 import matplotlib
@@ -22,7 +23,6 @@ plt.rcParams['axes.ymargin'] = 0.10
 
 class AutomatedFTPUpdater:
     def __init__(self):
-        # FTP с CSV отчётами — значения из переменных окружения
         self.ftp_config = {
             'host': os.environ['PNL_FTP_HOST'],
             'port': int(os.environ.get('PNL_FTP_PORT', '21')),
@@ -39,10 +39,8 @@ class AutomatedFTPUpdater:
 
         self.files = [f"{code}_PnL.csv" for code in self.accounts.keys()]
 
-    # 1) скачать CSV с RETRY
+    # 1) CSV с RETRY
     def download_files(self, max_retries=3, retry_delay=5):
-        """Скачивание файлов с FTP с автоматическими повторами при сбоях"""
-
         for attempt in range(max_retries):
             try:
                 print(f"FTP connect... (попытка {attempt + 1}/{max_retries})")
@@ -78,7 +76,6 @@ class AutomatedFTPUpdater:
                     print(
                         f"✅ CSV скачано {len(downloaded)}/{len(self.files)}: "
                         + ", ".join(downloaded)
-                        + "\n"
                     )
                     return True
                 else:
@@ -96,7 +93,7 @@ class AutomatedFTPUpdater:
 
         return False
 
-    #подготовка данных
+    # подготовка данных
     def _prepare_returns(self, code: str):
         csv_file = f"{code}_PnL.csv"
 
@@ -122,7 +119,7 @@ class AutomatedFTPUpdater:
 
         return returns
 
-    #2) QuantStats HTML
+    # 2) QuantStats HTML
     def _build_report(self, returns, out_html, title):
         qs.reports.html(
             returns,
@@ -132,7 +129,7 @@ class AutomatedFTPUpdater:
         )
         print(f"✅ Отчёт создан: {out_html}")
 
-    #3) CSS-фикс
+    # 3) CSS-фикс:
     def _postprocess_styles(self, path: str):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -157,6 +154,15 @@ class AutomatedFTPUpdater:
 """
             html = re.sub(r"</head>", anti_clip + "\n</head>", html, flags=re.I)
 
+            now = datetime.datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
+            html = re.sub(
+                r'(<dt>)([^<]+)(</dt>)',
+                r'\1\2 &nbsp;|&nbsp; upd: ' + now + r'\3',
+                html,
+                count=1,
+                flags=re.I,
+            )
+
             with open(path, "w", encoding="utf-8") as f:
                 f.write(html)
 
@@ -165,7 +171,7 @@ class AutomatedFTPUpdater:
         except Exception as e:
             print(f"⚠️ CSS-фикс не применён для {path}: {e}")
 
-    #4) Замена SVG Cumulative Returns
+    # 4) Замена SVG Cumulative Returns
     def _replace_cumreturns_svg(self, returns, html_path: str, headroom: float = 0.12):
         try:
             with open(html_path, "r", encoding="utf-8") as f:
@@ -232,7 +238,7 @@ class AutomatedFTPUpdater:
         except Exception as e:
             print(f"⚠️ SVG ошибка в {html_path}: {e}")
 
-    #полный цикл
+    # полный цикл
     def generate_reports(self):
         try:
             for code, info in self.accounts.items():
