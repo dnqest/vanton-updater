@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+update.log
+*.csv
+1548021.html
+44243855.html
+highrisk.html
+crossmarket.html
+prime.html
+CryptO.html
