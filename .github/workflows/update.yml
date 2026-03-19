@@ -40,7 +40,7 @@ jobs:
         run: |
           for f in prime.html crossmarket.html highrisk.html; do
             if [[ -f "$f" ]]; then
-              curl --silent --show-error --ssl-reqd \
+              curl --silent --show-error --insecure \
                    --ftp-method nocwd --ftp-pasv \
                    --connect-timeout 25 --max-time 180 \
                    --retry 6 --retry-delay 15 --retry-connrefused \
